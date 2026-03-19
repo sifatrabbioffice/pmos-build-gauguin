@@ -1,0 +1,29 @@
+# PostmarketOS Build Configuration for Xiaomi Gauguin
+
+device:
+  name: "Xiaomi Gauguin"
+  codename: "gauguin"
+  manufacturer: "xiaomi"
+  arch: "aarch64"
+  kernel: "linux-postmarketos-qcom"
+
+build:
+  ui: "phosh"
+  packages:
+    - "alpine-base"
+    - "postmarketos-base"
+    - "postmarketos-ui-phosh"
+    - "sudo"
+    - "openssh"
+    - "nano"
+    - "vim"
+
+output:
+  format: "img"
+  compress: true
+  boot_size: "512M"
+  root_size: "2G"
+
+flashing:
+  method: "fastboot"
+  recovery: "fastboot"
