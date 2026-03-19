@@ -1,0 +1,113 @@
+name: PostmarketOS Gauguin Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      upload_to_odrive:
+        description: 'Upload to ODrive'
+        required: false
+        default: 'true'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            wget \
+            curl \
+            python3 \
+            python3-pip \
+            openssl \
+            libssl-dev \
+            libffi-dev \
+            sudo \
+            gcc \
+            make
+            
+      - name: Install pmbootstrap
+        run: |
+          echo "📦 Installing pmbootstrap..."
+          git clone https://github.com/postmarketOS/pmbootstrap.git ~/pmbootstrap
+          cd ~/pmbootstrap
+          pip3 install -e .
+          
+      - name: Initialize pmbootstrap
+        run: |
+          echo "⚙️  Initializing pmbootstrap environment..."
+          mkdir -p /tmp/pmbootstrap-work
+          pmbootstrap init --non-interactive \
+            --username pmos \
+            --hostname gauguin \
+            --work /tmp/pmbootstrap-work \
+            --mirror-alpine https://dl-cdn.alpinelinux.org/alpine \
+            --mirror-postmarket https://mirrors.postmarketos.org/postmarketos
+            
+      - name: Build PostmarketOS kernel
+        run: |
+          echo "🔨 Building Linux kernel..."
+          cd ~ && pmbootstrap build linux-postmarketos-qcom
+          
+      - name: Build device packages
+        run: |
+          echo "🔧 Building device packages..."
+          cd ~ && pmbootstrap build device-xiaomi-gauguin
+          
+      - name: Build rootfs
+        run: |
+          echo "📦 Building rootfs..."
+          cd ~ && pmbootstrap build rootfs
+          
+      - name: Install packages
+        run: |
+          echo "📚 Installing packages..."
+          cd ~ && pmbootstrap install \
+            --hostkeys \
+            --recovery-keymap
+          
+      - name: Generate IMG file
+        run: |
+          echo "💾 Generating IMG file..."
+          mkdir -p /tmp/pmos-gauguin-release
+          cd ~ && pmbootstrap export --outdir=/tmp/pmos-gauguin-release
+          
+      - name: List generated files
+        run: |
+          echo "📋 Generated files:"
+          ls -lh /tmp/pmos-gauguin-release/
+          
+      - name: Prepare release artifacts
+        run: |
+          echo "📦 Preparing release artifacts..."
+          mkdir -p ./release-artifacts
+          cp /tmp/pmos-gauguin-release/pmos-xiaomi-gauguin* ./release-artifacts/ || true
+          ls -lh ./release-artifacts/
+          
+      - name: Generate checksums
+        run: |
+          echo "✅ Generating checksums..."
+          cd ./release-artifacts
+          sha256sum * > SHA256SUMS
+          md5sum * > MD5SUMS
+          echo "SHA256 Checksums:"
+          cat SHA256SUMS
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: pmos-gauguin-build
+          path: ./release-artifacts/
+          retention-days: 30
